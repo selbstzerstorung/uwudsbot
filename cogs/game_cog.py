@@ -48,7 +48,7 @@ SPECIAL_MEDIA: dict[int, str] = {
     1488: "https://imgur.com/65CmFKj",
 }
 
-DB_PATH = "bot_data.db"
+DB_PATH = "/data/bot_data.db"
 
 
 # ─── База данных ──────────────────────────────────────────────────────────────
