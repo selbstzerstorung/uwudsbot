@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 REROLL_COOLDOWN_DAYS = int(os.getenv("REROLL_COOLDOWN_DAYS", "7"))
-DB_PATH = "bot_data.db"
+DB_PATH = "/data/bot_data.db"
 
 # ─── Погонялы ─────────────────────────────────────────────────────────────────
 NICKNAMES: dict[str, str] = {
