@@ -22,8 +22,8 @@ MSK_HOUR_START = int(os.getenv("MSK_HOUR_START", "07"))
 MSK_HOUR_END   = int(os.getenv("MSK_HOUR_END",   "23"))
 
 SPECIAL_NUMBERS = [1, 31, 56, 78, 61, 67, 69, 42, 52, 120, 228, 230, 456, 1337, 1488, 333, 666, 777, 420, 999]
-CHANCE_SPECIAL  = 30.0
-CHANCE_NORMAL   = 70.0
+CHANCE_SPECIAL  = 10.0
+CHANCE_NORMAL   = 90.0
 
 SPECIAL_MEDIA: dict[int, str] = {
     1:    "https://i.imgur.com/2Kc9r61.gif",
