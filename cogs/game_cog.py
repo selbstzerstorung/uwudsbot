@@ -14,7 +14,7 @@ load_dotenv()
 # ─── Конфигурация из .env ─────────────────────────────────────────────────────
 TARGET_CHANNEL_IDS = [
     int(x.strip())
-    for x in os.getenv("TARGET_CHANNEL_IDS", "1189219118495318036,1439613972864176168").split(",")
+    for x in os.getenv("TARGET_CHANNEL_IDS", "1189219118495318036").split(",")
 ]
 PUNISH_ROLE_ID = int(os.getenv("PUNISH_ROLE_ID", "1507851659865227444"))
 EVENT_DURATION = int(os.getenv("EVENT_DURATION", "180"))
@@ -280,7 +280,7 @@ class GameCog(commands.Cog):
             )
         else:
             for ch in channels:
-                await ch.send("Ничего не выпало, сосите бля.")
+                await ch.send("")
 
         return rolled_number
 
