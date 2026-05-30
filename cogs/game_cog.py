@@ -12,9 +12,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ─── Конфигурация из .env ─────────────────────────────────────────────────────
+# Даже если здесь указан один ID, бот корректно его прочитает
 TARGET_CHANNEL_IDS = [
     int(x.strip())
     for x in os.getenv("TARGET_CHANNEL_IDS", "1189219118495318036").split(",")
+    if x.strip()
 ]
 PUNISH_ROLE_ID = int(os.getenv("PUNISH_ROLE_ID", "1507851659865227444"))
 EVENT_DURATION = int(os.getenv("EVENT_DURATION", "180"))
@@ -65,16 +67,13 @@ def db_init() -> None:
             );
         """)
 
-
 def db_event_clear() -> None:
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute("DELETE FROM event_clicks")
 
-
 def db_event_add_click(user_id: int) -> None:
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute("INSERT OR IGNORE INTO event_clicks (user_id) VALUES (?)", (user_id,))
-
 
 def db_event_has_clicked(user_id: int) -> bool:
     with sqlite3.connect(DB_PATH) as conn:
@@ -82,14 +81,12 @@ def db_event_has_clicked(user_id: int) -> bool:
             "SELECT 1 FROM event_clicks WHERE user_id = ?", (user_id,)
         ).fetchone() is not None
 
-
 def db_log_tribute(user_id: int) -> None:
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute(
             "INSERT INTO tribute_log (user_id, ts) VALUES (?, ?)",
             (user_id, datetime.now(timezone.utc).isoformat()),
         )
-
 
 def db_leaderboard(limit: int = 10) -> list[tuple[int, int]]:
     with sqlite3.connect(DB_PATH) as conn:
@@ -193,18 +190,23 @@ class GameCog(commands.Cog):
         update_interval = 30
         remaining = EVENT_DURATION
 
+        # Обновляем сообщение каждые 30 секунд
         while remaining > update_interval:
             await asyncio.sleep(update_interval)
             remaining -= update_interval
+            
             updated_embed = make_event_embed(rolled_number, media_url, remaining)
             for msg in messages:
                 try:
                     await msg.edit(embed=updated_embed)
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"[Таймер] Не удалось обновить сообщение: {e}")
 
-        await asyncio.sleep(remaining)
+        # Дожидаемся остаток времени
+        if remaining > 0:
+            await asyncio.sleep(remaining)
 
+        # Финальный эмбед
         final_embed = discord.Embed(
             description=f"Время вышло! Число было **{rolled_number}**.",
             color=discord.Color.red(),
@@ -212,12 +214,14 @@ class GameCog(commands.Cog):
         if media_url:
             final_embed.set_image(url=media_url)
 
+        # Закрываем ивент
         for msg in messages:
             try:
                 await msg.edit(embed=final_embed, view=None)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[Таймер] Не удалось закрыть ивент: {e}")
 
+        # Раздаем наказания
         await self._apply_punishment(eligible_ids, channels)
 
     async def _apply_punishment(
@@ -245,7 +249,7 @@ class GameCog(commands.Cog):
                     except discord.Forbidden:
                         print(f"Нет прав выдать роль для {member.name}")
 
-# ── Основная логика ───────────────────────────────────────────────────────
+    # ── Основная логика ───────────────────────────────────────────────────────
     async def run_game_logic(
         self,
         channels: list[discord.TextChannel],
@@ -263,25 +267,31 @@ class GameCog(commands.Cog):
             db_event_clear()
             media_url = SPECIAL_MEDIA.get(rolled_number)
 
-            # Определяем, кто может участвовать (те, кто видит хоть один из каналов)
             eligible_ids: set[int] = set()
+            sent_messages: list[discord.Message] = []
+
             for ch in channels:
+                # Проверяем, есть ли у бота права отправлять сообщения в этот канал
+                if not ch.permissions_for(ch.guild.me).send_messages:
+                    print(f"Нет прав писать в канал {ch.name}")
+                    continue
+
                 for member in ch.guild.members:
                     if not member.bot and ch.permissions_for(member).view_channel:
                         eligible_ids.add(member.id)
 
-            sent_messages: list[discord.Message] = []
-            for ch in channels:
                 embed = make_event_embed(rolled_number, media_url, EVENT_DURATION)
-                msg = await ch.send(embed=embed, view=RespectButton(cog=self))
-                sent_messages.append(msg)
+                try:
+                    msg = await ch.send(embed=embed, view=RespectButton(cog=self))
+                    sent_messages.append(msg)
+                except Exception as e:
+                    print(f"Ошибка при отправке в {ch.name}: {e}")
 
-            asyncio.create_task(
-                self._event_timer_task(sent_messages, rolled_number, media_url, eligible_ids, channels)
-            )
-        
-        # Если rolled_number НЕ в SPECIAL_NUMBERS, мы просто ничего не делаем.
-        # Ветка else была удалена, чтобы бот молчал при обычных числах.
+            # Запускаем таймер только если удалось отправить хотя бы 1 сообщение
+            if sent_messages:
+                asyncio.create_task(
+                    self._event_timer_task(sent_messages, rolled_number, media_url, eligible_ids, channels)
+                )
         
         return rolled_number
 
