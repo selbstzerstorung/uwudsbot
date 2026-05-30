@@ -245,7 +245,7 @@ class GameCog(commands.Cog):
                     except discord.Forbidden:
                         print(f"Нет прав выдать роль для {member.name}")
 
-    # ── Основная логика ───────────────────────────────────────────────────────
+# ── Основная логика ───────────────────────────────────────────────────────
     async def run_game_logic(
         self,
         channels: list[discord.TextChannel],
@@ -253,7 +253,8 @@ class GameCog(commands.Cog):
     ) -> Optional[int]:
         if not bypass_time:
             msk_tz = timezone(timedelta(hours=3))
-            if not (MSK_HOUR_START <= datetime.now(msk_tz).hour <= MSK_HOUR_END):
+            now_hour = datetime.now(msk_tz).hour
+            if not (MSK_HOUR_START <= now_hour <= MSK_HOUR_END):
                 return None
 
         rolled_number: int = random.choices(self.population, weights=self.weights, k=1)[0]
@@ -262,12 +263,12 @@ class GameCog(commands.Cog):
             db_event_clear()
             media_url = SPECIAL_MEDIA.get(rolled_number)
 
-            eligible_ids: set[int] = {
-                member.id
-                for ch in channels
-                for member in ch.guild.members
-                if not member.bot and ch.permissions_for(member).view_channel
-            }
+            # Определяем, кто может участвовать (те, кто видит хоть один из каналов)
+            eligible_ids: set[int] = set()
+            for ch in channels:
+                for member in ch.guild.members:
+                    if not member.bot and ch.permissions_for(member).view_channel:
+                        eligible_ids.add(member.id)
 
             sent_messages: list[discord.Message] = []
             for ch in channels:
@@ -278,10 +279,10 @@ class GameCog(commands.Cog):
             asyncio.create_task(
                 self._event_timer_task(sent_messages, rolled_number, media_url, eligible_ids, channels)
             )
-        else:
-            for ch in channels:
-                await ch.send("")
-
+        
+        # Если rolled_number НЕ в SPECIAL_NUMBERS, мы просто ничего не делаем.
+        # Ветка else была удалена, чтобы бот молчал при обычных числах.
+        
         return rolled_number
 
     # ── Hourly loop ───────────────────────────────────────────────────────────
